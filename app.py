@@ -12,7 +12,12 @@ import io
 
 # --- Configuration ---
 # ⚠️ ⚠️ ⚠️ ဤနေရာတွင် သင်၏ API Key အမှန်ကို မဖြစ်မနေ ထည့်ပါ ⚠️ ⚠️ ⚠️
-GOOGLE_API_KEY = "AIzaSyAZPKm775hHrXDatQmrLwESFVx1Xb5kiWg"
+# Key ကို ကုဒ်ထဲမှာ တိုက်ရိုက်မရေးဘဲ Secrets ကနေ လှမ်းယူပါမယ်
+if "GOOGLE_API_KEY" in st.secrets:
+    GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
+else:
+    st.error("API Key မတွေ့ပါ။ Secrets တွင် ထည့်သွင်းပေးပါ။")
+    st.stop()
 
 try:
     genai.configure(api_key=GOOGLE_API_KEY)
@@ -185,3 +190,4 @@ if user_query:
                 "content": response_text,
                 "audio_path": audio_file
             })
+
