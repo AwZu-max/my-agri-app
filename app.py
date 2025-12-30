@@ -9,7 +9,6 @@ import os
 import re
 from pydub import AudioSegment
 import io
---- Global Variables ---
 user_image = None
 # --- Configuration ---
 # ⚠️ ⚠️ ⚠️ ဤနေရာတွင် သင်၏ API Key အမှန်ကို မဖြစ်မနေ ထည့်ပါ ⚠️ ⚠️ ⚠️
@@ -200,5 +199,6 @@ if user_query:
                 "content": response_text,
                 "audio_path": audio_file
             })
+
 
 
