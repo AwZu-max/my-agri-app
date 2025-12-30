@@ -31,7 +31,26 @@ except Exception as e:
 st.set_page_config(page_title="Smart Agri Pro", page_icon="🌾", layout="wide")
 
 st.markdown("""
-    <h1 style='text-align: center; color: #2E8B57; font-size: 2.0em; font-weight: bold;'>
+    <style>
+    /* ပုံမှန် ကွန်ပျူတာ Screen အတွက် ဒီဇိုင်း */
+    .responsive-title {
+        text-align: center;
+        color: #2E8B57;
+        font-size: 3em; /* ကွန်ပျူတာမှာ စာလုံးဆိုဒ် 3 */
+        font-weight: bold;
+        margin-bottom: 0px;
+    }
+    
+    /* ဖုန်း Screen (အကျယ် 600px အောက်) အတွက် ဒီဇိုင်း */
+    @media (max-width: 600px) {
+        .responsive-title {
+            font-size: 1.5em; /* ဖုန်းမှာကျတော့ စာလုံးဆိုဒ် 1.5 ပဲ ထားမယ် */
+            margin-top: 10px;
+        }
+    }
+    </style>
+
+    <h1 class="responsive-title">
         🌾 Smart Agri - စိုက်ပျိုးရေး လက်ထောက်
     </h1>
 """, unsafe_allow_html=True)
@@ -209,3 +228,4 @@ if user_query:
                 "content": response_text,
                 "audio_path": audio_file
             })
+
