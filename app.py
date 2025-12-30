@@ -7,7 +7,8 @@ from streamlit_mic_recorder import mic_recorder
 import tempfile
 import os
 import re
-
+from pydub import AudioSegment
+import io
 # --- Configuration ---
 # ⚠️ ⚠️ ⚠️ ဤနေရာတွင် သင်၏ API Key အမှန်ကို မဖြစ်မနေ ထည့်ပါ ⚠️ ⚠️ ⚠️
 GOOGLE_API_KEY = "AIzaSyAZPKm775hHrXDatQmrLwESFVx1Xb5kiWg"
@@ -56,33 +57,32 @@ def text_to_speech(text):
         return None
 
 def transcribe_audio(audio_bytes):
-    """အသံဖိုင်ကို စာသားပြောင်းခြင်း"""
+    """အသံဖိုင်ကို စာသားပြောင်းခြင်း (Robust Version)"""
     r = sr.Recognizer()
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as fp:
-        fp.write(audio_bytes)
-        fp.name
-    with sr.AudioFile(fp.name) as source:
-        try:
+    
+    try:
+        # အသံဖိုင်ကို pydub ဖြင့် အရင်ပြောင်းပါ (Mobile Format ပြဿနာရှင်းရန်)
+        audio_segment = AudioSegment.from_file(io.BytesIO(audio_bytes))
+        
+        # WAV ဖိုင်အဖြစ် ယာယီထုတ်မည်
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as fp:
+            audio_segment.export(fp.name, format="wav")
+            temp_filename = fp.name
+
+        # Speech Recognition သို့ ပို့မည်
+        with sr.AudioFile(temp_filename) as source:
             audio_data = r.record(source)
             text = r.recognize_google(audio_data, language="my-MM")
-            return text
-        except:
-            return None
-        finally:
-            if os.path.exists(fp.name):
-                os.remove(fp.name)
+            
+        # ပြီးရင် ဖျက်မည်
+        if os.path.exists(temp_filename):
+            os.remove(temp_filename)
+            
+        return text
 
-def get_ai_response(prompt, image=None):
-    try:
-        chat = model.start_chat(history=[])
-        if image:
-            response = chat.send_message([prompt, image])
-        else:
-            response = chat.send_message(prompt)
-        return response.text
     except Exception as e:
-        return f"စနစ်ချို့ယွင်းချက် ရှိနေပါသည်: {e}"
-
+        print(f"Audio Error: {e}")
+        return None
 # --- Sidebar Controls ---
 with st.sidebar:
     st.header("ဆက်တင်များ (Settings)")
@@ -199,3 +199,4 @@ if user_query:
                 "content": response_text,
                 "audio_path": audio_file
             })
+
