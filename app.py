@@ -9,6 +9,8 @@ import os
 import re
 from pydub import AudioSegment
 import io
+--- Global Variables ---
+user_image = None
 # --- Configuration ---
 # ⚠️ ⚠️ ⚠️ ဤနေရာတွင် သင်၏ API Key အမှန်ကို မဖြစ်မနေ ထည့်ပါ ⚠️ ⚠️ ⚠️
 GOOGLE_API_KEY = "AIzaSyAZPKm775hHrXDatQmrLwESFVx1Xb5kiWg"
@@ -107,7 +109,6 @@ with st.sidebar:
 
 # 1. Context Setting based on Mode
 context_prompt = ""
-user_image = None
 
 with st.expander("📝 အခြေခံ အချက်အလက်များ ဖြည့်သွင်းရန် (ဤနေရာကို နှိပ်ပါ)", expanded=True):
     col_input1, col_input2 = st.columns([2, 1])
@@ -199,4 +200,5 @@ if user_query:
                 "content": response_text,
                 "audio_path": audio_file
             })
+
 
