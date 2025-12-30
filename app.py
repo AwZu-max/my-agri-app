@@ -21,7 +21,14 @@ except Exception as e:
 
 # --- Page Setup ---
 st.set_page_config(page_title="Smart Agri Pro Voice", page_icon="🌾", layout="wide")
-st.title("🌾 Smart Agri - စွယ်စုံသုံး စိုက်ပျိုးရေးလက်ထောက်")
+
+# --- Custom Title (HTML/CSS) ---
+# ခေါင်းစဉ်ကို သေသပ်အောင် ပြင်ဆင်ခြင်း
+st.markdown("""
+    <h1 style='text-align: center; color: #2E8B57; font-size: 2.5em; font-weight: bold;'>
+        🌾 Smart Agri - စွယ်စုံသုံး စိုက်ပျိုးရေးလက်ထောက်
+    </h1>
+""", unsafe_allow_html=True)
 
 # --- Session State Management ---
 if "history" not in st.session_state:
@@ -32,20 +39,15 @@ if "generated_audio" not in st.session_state:
 # --- Helper Functions ---
 
 def clean_text_for_speech(text):
-    """
-    AI က ပေးတဲ့ Markdown စာသားတွေ (Star, Hash, Dash) ကို
-    အသံမထွက်ခင် ရှင်းထုတ်ပစ်မည့် Function (အပိုသံတွေ မပါအောင်)
-    """
-    # Remove markdown symbols (*, #, -, etc.)
-    clean = re.sub(r'[\*\#\-\_]', '', text) 
-    # Remove excessive spaces
+    """AI မှ ပေးသော စာသားများကို အသံမထွက်မီ သန့်စင်ခြင်း"""
+    clean = re.sub(r'[\*\#\-\_]', '', text)
     clean = " ".join(clean.split())
     return clean
 
 def text_to_speech(text):
     """မြန်မာစာသားကို အသံပြောင်းခြင်း"""
     try:
-        clean_text = clean_text_for_speech(text) # စာသားသန့်စင်ခြင်း
+        clean_text = clean_text_for_speech(text)
         tts = gTTS(text=clean_text, lang='my')
         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
             tts.save(fp.name)
@@ -83,40 +85,40 @@ def get_ai_response(prompt, image=None):
 
 # --- Sidebar Controls ---
 with st.sidebar:
-    st.header("လုပ်ဆောင်ချက် ရွေးချယ်ပါ")
-    
-    # Mode Selection (မူလ feature များ ပြန်ထည့်ခြင်း)
-    app_mode = st.radio("Mode:", 
+    st.header("ဆက်တင်များ (Settings)")
+
+    # Mode Selection
+    app_mode = st.radio("လုပ်ဆောင်ချက် ရွေးချယ်ပါ:",
         ["🏡 အိမ်ခြံသီးနှံ (Garden)", "🌾 စပါးစိုက်ခင်း (Paddy)", "🍂 ရောဂါစစ်ဆေး (Doctor)"])
-    
+
     st.divider()
-    
-    # Clear Chat Button (အပင်သစ် မေးရန်)
-    if st.button("🔄 နောက်တစ်မျိုး ပြောင်းမေးမယ် (Clear)", type="primary"):
+
+    # Clear Chat Button (အရောင်ပြောင်းထားသည်)
+    if st.button("🔄 နောက်တစ်မျိုး ပြောင်းမေးမည် (Clear)"):
         st.session_state.history = []
         st.session_state.generated_audio = None
         st.rerun()
 
     st.divider()
     enable_voice = st.checkbox("အသံဖြင့် ပြန်ဖတ်ပြပါ", value=True)
-    st.info("Tip: မိုက်ခလုတ်နှိပ်ပြီး မြန်မာလို မေးနိုင်ပါသည်။")
+    st.info("💡 အကြံပြုချက်: မိုက်ခလုတ်နှိပ်ပြီး မြန်မာလို ပြောကြား၍ မေးမြန်းနိုင်ပါသည်။")
 
 # --- Main Layout ---
 
-# 1. Context Setting based on Mode (Mode အလိုက် အချက်အလက် တောင်းခြင်း)
+# 1. Context Setting based on Mode
 context_prompt = ""
 user_image = None
 
-with st.expander("📝 အချက်အလက် ဖြည့်သွင်းရန် (နှိပ်ပါ)", expanded=True):
+with st.expander("📝 အခြေခံ အချက်အလက်များ ဖြည့်သွင်းရန် (ဤနေရာကို နှိပ်ပါ)", expanded=True):
     col_input1, col_input2 = st.columns([2, 1])
-    
+
     if app_mode == "🏡 အိမ်ခြံသီးနှံ (Garden)":
         with col_input1:
             plant_name = st.text_input("အပင်အမည် (ဥပမာ- ရုံးပတီ):")
             field_desc = st.text_input("စိုက်ခင်း အနေအထား:")
         with col_input2:
             tank_size = st.number_input("ရေကန် (ဂါလံ):", value=50)
-        
+
         if plant_name:
             context_prompt = f"အပင်: {plant_name}. ရေကန်: {tank_size} ဂါလံ. မြေအနေအထား: {field_desc}. (မြေသြဇာစပ်နည်းနှင့် ပြုစုနည်း တွက်ပေးပါ)"
 
@@ -126,7 +128,7 @@ with st.expander("📝 အချက်အလက် ဖြည့်သွင်�
             status = st.text_input("အပင် အခြေအနေ:")
         with col_input2:
             acres = st.number_input("စိုက်ဧက:", value=5)
-            
+
         context_prompt = f"စပါးသက်တမ်း: {days} ရက်. စိုက်ဧက: {acres} ဧက. အခြေအနေ: {status}. (လိုအပ်သော ရေ၊ မြေသြဇာနှင့် ဆေး အကြံပေးပါ)"
 
     elif app_mode == "🍂 ရောဂါစစ်ဆေး (Doctor)":
@@ -157,54 +159,43 @@ with chat_container:
     for msg in st.session_state.history:
         with st.chat_message(msg["role"]):
             st.write(msg["content"])
-            # Play Audio if available for this message
             if "audio_path" in msg and msg["audio_path"]:
                 st.audio(msg["audio_path"], format="audio/mp3")
 
 # 4. Handling Inputs (Voice or Text)
 user_query = None
 
-# Case A: User spoke via Microphone
 if voice_text:
     user_query = voice_text
-    
-# Case B: User typed in Chat Box
-if prompt := st.chat_input("သိချင်တာရှိသေးရင် ဆက်လက်မေးမြန်းနိုင်ပါတယ်..."):
+
+if prompt := st.chat_input("သိလိုသည်များကို ဆက်လက်မေးမြန်းပါ..."):
     user_query = prompt
 
-# Case C: Context Prompt (First run logic)
-# (အကယ်၍ အသုံးပြုသူက အပေါ်က Form ဖြည့်ပြီး မိုက်ခလုတ်နှိပ်လိုက်ရင် Context ပါ ထည့်ပေါင်းပေးရမယ်)
 if user_query:
     final_prompt = user_query
-    
-    # ပထမဆုံးအကြိမ်ဆိုရင် Context ပါ ထည့်တွက်မယ်
+
     if len(st.session_state.history) == 0 and context_prompt:
         final_prompt = f"{context_prompt} \n\n အသုံးပြုသူမေးခွန်း: {user_query}"
-    
-    # 1. Show User Message
+
     st.session_state.history.append({"role": "user", "content": user_query})
     with st.chat_message("user"):
         st.write(user_query)
-    
-    # 2. Generate AI Response
+
     with st.chat_message("assistant"):
-        with st.spinner("AI ပညာရှင်စဉ်းစားနေပါသည်..."):
-            # Ensure AI responds in Burmese
+        with st.spinner("AI စဉ်းစားနေပါသည်..."):
             full_prompt = f"{final_prompt} (Please answer in Burmese language only. Do not include asterisks or markdown symbols in speech friendly parts.)"
-            
+
             response_text = get_ai_response(full_prompt, user_image)
             st.write(response_text)
-            
-            # 3. Generate Audio (Optional)
+
             audio_file = None
             if enable_voice:
                 audio_file = text_to_speech(response_text)
                 if audio_file:
                     st.audio(audio_file, format="audio/mp3")
 
-            # 4. Save to History
             st.session_state.history.append({
-                "role": "assistant", 
+                "role": "assistant",
                 "content": response_text,
                 "audio_path": audio_file
             })
