@@ -1,0 +1,210 @@
+import streamlit as st
+import google.generativeai as genai
+from PIL import Image
+import speech_recognition as sr
+from gtts import gTTS
+from streamlit_mic_recorder import mic_recorder
+import tempfile
+import os
+import re
+
+# --- Configuration ---
+# ⚠️ ⚠️ ⚠️ ဤနေရာတွင် သင်၏ API Key အမှန်ကို မဖြစ်မနေ ထည့်ပါ ⚠️ ⚠️ ⚠️
+GOOGLE_API_KEY = "AIzaSyAZPKm775hHrXDatQmrLwESFVx1Xb5kiWg"
+
+try:
+    genai.configure(api_key=GOOGLE_API_KEY)
+    model = genai.GenerativeModel('gemini-2.5-flash')
+except Exception as e:
+    st.error(f"API Key Error: {e}")
+    st.stop()
+
+# --- Page Setup ---
+st.set_page_config(page_title="Smart Agri Pro Voice", page_icon="🌾", layout="wide")
+st.title("🌾 Smart Agri - စွယ်စုံသုံး စိုက်ပျိုးရေးလက်ထောက်")
+
+# --- Session State Management ---
+if "history" not in st.session_state:
+    st.session_state.history = []
+if "generated_audio" not in st.session_state:
+    st.session_state.generated_audio = None
+
+# --- Helper Functions ---
+
+def clean_text_for_speech(text):
+    """
+    AI က ပေးတဲ့ Markdown စာသားတွေ (Star, Hash, Dash) ကို
+    အသံမထွက်ခင် ရှင်းထုတ်ပစ်မည့် Function (အပိုသံတွေ မပါအောင်)
+    """
+    # Remove markdown symbols (*, #, -, etc.)
+    clean = re.sub(r'[\*\#\-\_]', '', text) 
+    # Remove excessive spaces
+    clean = " ".join(clean.split())
+    return clean
+
+def text_to_speech(text):
+    """မြန်မာစာသားကို အသံပြောင်းခြင်း"""
+    try:
+        clean_text = clean_text_for_speech(text) # စာသားသန့်စင်ခြင်း
+        tts = gTTS(text=clean_text, lang='my')
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
+            tts.save(fp.name)
+            return fp.name
+    except:
+        return None
+
+def transcribe_audio(audio_bytes):
+    """အသံဖိုင်ကို စာသားပြောင်းခြင်း"""
+    r = sr.Recognizer()
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as fp:
+        fp.write(audio_bytes)
+        fp.name
+    with sr.AudioFile(fp.name) as source:
+        try:
+            audio_data = r.record(source)
+            text = r.recognize_google(audio_data, language="my-MM")
+            return text
+        except:
+            return None
+        finally:
+            if os.path.exists(fp.name):
+                os.remove(fp.name)
+
+def get_ai_response(prompt, image=None):
+    try:
+        chat = model.start_chat(history=[])
+        if image:
+            response = chat.send_message([prompt, image])
+        else:
+            response = chat.send_message(prompt)
+        return response.text
+    except Exception as e:
+        return f"စနစ်ချို့ယွင်းချက် ရှိနေပါသည်: {e}"
+
+# --- Sidebar Controls ---
+with st.sidebar:
+    st.header("လုပ်ဆောင်ချက် ရွေးချယ်ပါ")
+    
+    # Mode Selection (မူလ feature များ ပြန်ထည့်ခြင်း)
+    app_mode = st.radio("Mode:", 
+        ["🏡 အိမ်ခြံသီးနှံ (Garden)", "🌾 စပါးစိုက်ခင်း (Paddy)", "🍂 ရောဂါစစ်ဆေး (Doctor)"])
+    
+    st.divider()
+    
+    # Clear Chat Button (အပင်သစ် မေးရန်)
+    if st.button("🔄 နောက်တစ်မျိုး ပြောင်းမေးမယ် (Clear)", type="primary"):
+        st.session_state.history = []
+        st.session_state.generated_audio = None
+        st.rerun()
+
+    st.divider()
+    enable_voice = st.checkbox("အသံဖြင့် ပြန်ဖတ်ပြပါ", value=True)
+    st.info("Tip: မိုက်ခလုတ်နှိပ်ပြီး မြန်မာလို မေးနိုင်ပါသည်။")
+
+# --- Main Layout ---
+
+# 1. Context Setting based on Mode (Mode အလိုက် အချက်အလက် တောင်းခြင်း)
+context_prompt = ""
+user_image = None
+
+with st.expander("📝 အချက်အလက် ဖြည့်သွင်းရန် (နှိပ်ပါ)", expanded=True):
+    col_input1, col_input2 = st.columns([2, 1])
+    
+    if app_mode == "🏡 အိမ်ခြံသီးနှံ (Garden)":
+        with col_input1:
+            plant_name = st.text_input("အပင်အမည် (ဥပမာ- ရုံးပတီ):")
+            field_desc = st.text_input("စိုက်ခင်း အနေအထား:")
+        with col_input2:
+            tank_size = st.number_input("ရေကန် (ဂါလံ):", value=50)
+        
+        if plant_name:
+            context_prompt = f"အပင်: {plant_name}. ရေကန်: {tank_size} ဂါလံ. မြေအနေအထား: {field_desc}. (မြေသြဇာစပ်နည်းနှင့် ပြုစုနည်း တွက်ပေးပါ)"
+
+    elif app_mode == "🌾 စပါးစိုက်ခင်း (Paddy)":
+        with col_input1:
+            days = st.slider("စပါးသက်တမ်း (ရက်):", 1, 120, 30)
+            status = st.text_input("အပင် အခြေအနေ:")
+        with col_input2:
+            acres = st.number_input("စိုက်ဧက:", value=5)
+            
+        context_prompt = f"စပါးသက်တမ်း: {days} ရက်. စိုက်ဧက: {acres} ဧက. အခြေအနေ: {status}. (လိုအပ်သော ရေ၊ မြေသြဇာနှင့် ဆေး အကြံပေးပါ)"
+
+    elif app_mode == "🍂 ရောဂါစစ်ဆေး (Doctor)":
+        uploaded_file = st.file_uploader("ရောဂါဖြစ်နေသော ပုံတင်ပါ:", type=["jpg", "png", "jpeg"])
+        if uploaded_file:
+            user_image = Image.open(uploaded_file)
+            st.image(user_image, caption="တင်ထားသောပုံ", width=200)
+            context_prompt = "ဒီပုံထဲက အပင်ရောဂါကို စစ်ဆေးပြီး ကုသနည်း ပြောပြပါ။"
+
+# 2. Voice Input Section (Top Area)
+col_voice, col_display = st.columns([1, 4])
+
+with col_voice:
+    st.write("🎙️ **အသံဖြင့် မေးရန်:**")
+    audio_blob = mic_recorder(start_prompt="🔴 Start", stop_prompt="⬛ Stop", key='recorder')
+
+# Voice Processing Logic
+voice_text = ""
+if audio_blob:
+    with st.spinner("အသံဖတ်နေသည်..."):
+        voice_text = transcribe_audio(audio_blob['bytes'])
+
+# 3. Chat Interface
+chat_container = st.container()
+
+# Display History
+with chat_container:
+    for msg in st.session_state.history:
+        with st.chat_message(msg["role"]):
+            st.write(msg["content"])
+            # Play Audio if available for this message
+            if "audio_path" in msg and msg["audio_path"]:
+                st.audio(msg["audio_path"], format="audio/mp3")
+
+# 4. Handling Inputs (Voice or Text)
+user_query = None
+
+# Case A: User spoke via Microphone
+if voice_text:
+    user_query = voice_text
+    
+# Case B: User typed in Chat Box
+if prompt := st.chat_input("သိချင်တာရှိသေးရင် ဆက်လက်မေးမြန်းနိုင်ပါတယ်..."):
+    user_query = prompt
+
+# Case C: Context Prompt (First run logic)
+# (အကယ်၍ အသုံးပြုသူက အပေါ်က Form ဖြည့်ပြီး မိုက်ခလုတ်နှိပ်လိုက်ရင် Context ပါ ထည့်ပေါင်းပေးရမယ်)
+if user_query:
+    final_prompt = user_query
+    
+    # ပထမဆုံးအကြိမ်ဆိုရင် Context ပါ ထည့်တွက်မယ်
+    if len(st.session_state.history) == 0 and context_prompt:
+        final_prompt = f"{context_prompt} \n\n အသုံးပြုသူမေးခွန်း: {user_query}"
+    
+    # 1. Show User Message
+    st.session_state.history.append({"role": "user", "content": user_query})
+    with st.chat_message("user"):
+        st.write(user_query)
+    
+    # 2. Generate AI Response
+    with st.chat_message("assistant"):
+        with st.spinner("AI ပညာရှင်စဉ်းစားနေပါသည်..."):
+            # Ensure AI responds in Burmese
+            full_prompt = f"{final_prompt} (Please answer in Burmese language only. Do not include asterisks or markdown symbols in speech friendly parts.)"
+            
+            response_text = get_ai_response(full_prompt, user_image)
+            st.write(response_text)
+            
+            # 3. Generate Audio (Optional)
+            audio_file = None
+            if enable_voice:
+                audio_file = text_to_speech(response_text)
+                if audio_file:
+                    st.audio(audio_file, format="audio/mp3")
+
+            # 4. Save to History
+            st.session_state.history.append({
+                "role": "assistant", 
+                "content": response_text,
+                "audio_path": audio_file
+            })
