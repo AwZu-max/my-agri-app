@@ -184,7 +184,9 @@ if user_query:
     with st.chat_message("assistant"):
         with st.spinner("AI စဉ်းစားနေပါသည်..."):
             full_prompt = f"{final_prompt} (Please answer in Burmese language only. Do not include asterisks or markdown symbols in speech friendly parts.)"
-
+# ⚠️ Error ကာကွယ်ရန် Safety Check (ဒီနေရာမှာ ထည့်ပါ)
+            if 'user_image' not in globals():
+                user_image = None
             response_text = get_ai_response(full_prompt, user_image)
             st.write(response_text)
 
@@ -199,6 +201,7 @@ if user_query:
                 "content": response_text,
                 "audio_path": audio_file
             })
+
 
 
 
