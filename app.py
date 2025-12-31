@@ -12,36 +12,44 @@ import io
 import random
 import time
 
-# --- Page Config (Must be the first command) ---
+# --- Page Config ---
 st.set_page_config(page_title="Smart Agri Pro", page_icon="🌾", layout="wide")
 
-# --- CSS for Professional UI ---
+# --- CSS for Mobile Polish (ဖုန်းအတွက် ဒီဇိုင်းပြင်ဆင်ချက်) ---
 st.markdown("""
     <style>
-    /* Main Title Styling */
+    /* Desktop Title */
     .main-title {
         text-align: center; color: #2E8B57; font-size: 2.5em; font-weight: bold; margin-bottom: 20px;
     }
     
-    /* Chat Message Styling */
-    .stChatMessage {
-        padding: 10px;
-        border-radius: 10px;
+    /* Sub-header Styling */
+    h2, h3 {
+        color: #444 !important;
     }
-    
-    /* Input Panel Styling */
-    .css-1r6slb0 {
-        border-right: 1px solid #ddd;
-        padding-right: 20px;
-    }
-    
-    /* Hide Streamlit Branding */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    
-    /* Responsive Text */
+
+    /* Mobile Responsive Fixes */
     @media (max-width: 600px) {
-        .main-title { font-size: 1.5em !important; }
+        /* ခေါင်းစဉ်ကြီးကို ဖုန်းမှာ သေးမယ် */
+        .main-title { 
+            font-size: 1.6em !important; 
+            margin-bottom: 10px;
+        }
+        /* အပိုင်းခေါင်းစဉ်တွေကိုလည်း သေးမယ် */
+        h2 {
+            font-size: 1.3em !important;
+        }
+        h3 {
+            font-size: 1.1em !important;
+        }
+        /* Sidebar ကို ဖုန်းမှာ အပြည့်မပေါ်အောင် */
+        section[data-testid="stSidebar"] {
+            width: 250px !important;
+        }
+        /* Chat Message တွေကို ဖုန်းမှာ နေရာချောင်အောင်လုပ်မယ် */
+        .stChatMessage {
+            padding: 5px !important;
+        }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -53,10 +61,9 @@ if "api_keys" in st.secrets:
 elif "GOOGLE_API_KEY" in st.secrets:
     api_keys = [st.secrets["GOOGLE_API_KEY"]]
 else:
-    api_keys = ["YOUR_API_KEY_HERE"] # Fallback
+    api_keys = ["YOUR_API_KEY_HERE"]
 
-# --- State Management (History Separation) ---
-# Mode တစ်ခုစီအတွက် အိတ် (History) သီးသန့် ခွဲထားလိုက်ပါပြီ
+# --- Session State ---
 if "garden_history" not in st.session_state: st.session_state.garden_history = []
 if "paddy_history" not in st.session_state: st.session_state.paddy_history = []
 if "doctor_history" not in st.session_state: st.session_state.doctor_history = []
@@ -107,7 +114,6 @@ def get_ai_response_smart(prompt, image=None):
             else:
                 response = chat.send_message(prompt)
             
-            # Auto-Correction (ခင်ဗျာ -> ရှင်)
             final_text = response.text.replace("ခင်ဗျာ", "ရှင်").replace("ခဗျာ", "ရှင်").replace("ครับ", "ရှင်")
             return final_text
         except Exception as e:
@@ -120,71 +126,66 @@ def get_ai_response_smart(prompt, image=None):
 # --- Main Layout ---
 st.markdown('<h1 class="main-title">🌾 Smart Agri - စိုက်ပျိုးရေး လက်ထောက်</h1>', unsafe_allow_html=True)
 
-# 1. Sidebar (Global Settings Only)
+# Sidebar
 with st.sidebar:
-    st.header("⚙️ ဆက်တင် (Settings)")
+    st.header("⚙️ ဆက်တင်")
     app_mode = st.radio("လုပ်ဆောင်ချက် ရွေးချယ်ပါ:",
         ["🏡 အိမ်ခြံသီးနှံ (Garden)", "🌾 စပါးစိုက်ခင်း (Paddy)", "🍂 ရောဂါစစ်ဆေး (Doctor)"])
     
     st.divider()
     enable_voice = st.checkbox("🔊 အသံဖြင့် ပြန်ဖတ်ပြပါ", value=True)
     
-    # Clear Chat Button (Mode အလိုက် သန့်ရှင်းရေးလုပ်မည်)
-    if st.button("🗑️ မှတ်တမ်းဖျက်မည် (Clear Chat)"):
+    if st.button("🗑️ မှတ်တမ်းဖျက်မည် (Clear)"):
         if app_mode == "🏡 အိမ်ခြံသီးနှံ (Garden)": st.session_state.garden_history = []
         elif app_mode == "🌾 စပါးစိုက်ခင်း (Paddy)": st.session_state.paddy_history = []
         elif app_mode == "🍂 ရောဂါစစ်ဆေး (Doctor)": st.session_state.doctor_history = []
         st.rerun()
 
-# 2. Main Dashboard (Split View)
-# Col 1 = Control Panel (Inputs), Col 2 = Chat Room
+# Dashboard Layout
 col_control, col_chat = st.columns([1, 2], gap="large")
 
-# --- COLUMN 1: Control Panel ---
+# --- COLUMN 1: Inputs (Expander Added for Mobile) ---
 with col_control:
-    st.subheader(f"📝 {app_mode}")
-    st.caption("အချက်အလက်များ ဤနေရာတွင် ဖြည့်ပါ")
-    
-    context_prompt = ""
-    current_image = None
-    
-    # Mode-Specific Inputs
-    if app_mode == "🏡 အိမ်ခြံသီးနှံ (Garden)":
-        plant_name = st.text_input("အပင်အမည်:", placeholder="ဥပမာ- ရုံးပတီ")
-        tank_size = st.number_input("ရေကန် (ဂါလံ):", value=50)
-        field_desc = st.text_input("မြေအနေအထား:", placeholder="နေရောင်ရ/မရ")
-        if plant_name:
-            context_prompt = f"Context: အပင်={plant_name}, ရေကန်={tank_size}ဂါလံ, မြေ={field_desc}."
+    # 🔥 ဖုန်းမှာ နေရာမယူအောင် Expander နဲ့ အုပ်လိုက်ပါပြီ
+    with st.expander(f"📝 {app_mode} အချက်အလက်ဖြည့်ရန် (နှိပ်ပါ)", expanded=True):
+        
+        context_prompt = ""
+        current_image = None
+        
+        if app_mode == "🏡 အိမ်ခြံသီးနှံ (Garden)":
+            plant_name = st.text_input("အပင်အမည်:", placeholder="ဥပမာ- ရုံးပတီ")
+            tank_size = st.number_input("ရေကန် (ဂါလံ):", value=50)
+            field_desc = st.text_input("မြေအနေအထား:", placeholder="နေရောင်ရ/မရ")
+            if plant_name:
+                context_prompt = f"Context: အပင်={plant_name}, ရေကန်={tank_size}ဂါလံ, မြေ={field_desc}."
 
-    elif app_mode == "🌾 စပါးစိုက်ခင်း (Paddy)":
-        days = st.slider("စပါးသက်တမ်း (ရက်):", 1, 120, 30)
-        acres = st.number_input("စိုက်ဧက:", value=5)
-        status = st.text_input("အပင် အခြေအနေ:", placeholder="အရွက်ဝါ၊ ပိုးကျ..")
-        context_prompt = f"Context: စပါးသက်တမ်း={days}ရက်, စိုက်ဧက={acres}, အခြေအနေ={status}."
+        elif app_mode == "🌾 စပါးစိုက်ခင်း (Paddy)":
+            days = st.slider("စပါးသက်တမ်း (ရက်):", 1, 120, 30)
+            acres = st.number_input("စိုက်ဧက:", value=5)
+            status = st.text_input("အပင် အခြေအနေ:", placeholder="အရွက်ဝါ၊ ပိုးကျ..")
+            context_prompt = f"Context: စပါးသက်တမ်း={days}ရက်, စိုက်ဧက={acres}, အခြေအနေ={status}."
 
-    elif app_mode == "🍂 ရောဂါစစ်ဆေး (Doctor)":
-        st.info("📸 ရောဂါဖြစ်နေသော အပင်ပုံကို အောက်တွင် တင်ပေးပါရှင်။")
-        uploaded_file = st.file_uploader("ဓာတ်ပုံ ရွေးပါ:", type=["jpg", "png", "jpeg"], key="doc_upload")
-        if uploaded_file:
-            current_image = Image.open(uploaded_file)
-            st.image(current_image, caption="တင်ထားသောပုံ", use_column_width=True)
-            context_prompt = "Context: This is a plant disease image diagnosis request."
+        elif app_mode == "🍂 ရောဂါစစ်ဆေး (Doctor)":
+            st.info("ဓာတ်ပုံတင်ပေးပါရှင် 👇")
+            uploaded_file = st.file_uploader("ပုံရွေးပါ:", type=["jpg", "png", "jpeg"], key="doc_upload")
+            if uploaded_file:
+                current_image = Image.open(uploaded_file)
+                st.image(current_image, caption="တင်ထားသောပုံ", use_column_width=True)
+                context_prompt = "Context: This is a plant disease image diagnosis request."
 
-    st.divider()
-    
-    # Common Controls (Image Upload & Voice)
-    if app_mode != "🍂 ရောဂါစစ်ဆေး (Doctor)":
-        uploaded_file = st.file_uploader("ဓာတ်ပုံ တွဲတင်လိုပါက (Optional):", type=["jpg", "png", "jpeg"], key="common_upload")
-        if uploaded_file:
-            current_image = Image.open(uploaded_file)
-            st.image(current_image, caption="တင်ထားသောပုံ", use_column_width=True)
+        # Common Upload & Voice
+        if app_mode != "🍂 ရောဂါစစ်ဆေး (Doctor)":
+            st.write("---")
+            uploaded_file = st.file_uploader("ဓာတ်ပုံ (Optional):", type=["jpg", "png", "jpeg"], key="common_upload")
+            if uploaded_file:
+                current_image = Image.open(uploaded_file)
+                st.image(current_image, caption="တင်ထားသောပုံ", use_column_width=True)
 
-    st.write("🎙️ **အသံဖြင့် ပြောရန်:**")
-    audio_blob = mic_recorder(start_prompt="🔴 Start", stop_prompt="⬛ Stop", key='recorder')
+        st.write("🎙️ **အသံဖြင့် ပြောရန်:**")
+        audio_blob = mic_recorder(start_prompt="🔴 Start", stop_prompt="⬛ Stop", key='recorder')
 
-# --- COLUMN 2: Chat Room ---
+# --- COLUMN 2: Chat ---
 with col_chat:
-    # 1. Determine which history to use
     if app_mode == "🏡 အိမ်ခြံသီးနှံ (Garden)":
         current_history = st.session_state.garden_history
     elif app_mode == "🌾 စပါးစိုက်ခင်း (Paddy)":
@@ -192,11 +193,9 @@ with col_chat:
     else:
         current_history = st.session_state.doctor_history
 
-    # 2. Display Welcome Message if empty
     if len(current_history) == 0:
-        st.info(f"မင်္ဂလာပါရှင်.. '{app_mode}' အတွက် လိုအပ်တာများ မေးမြန်းနိုင်ပါပြီ။")
+        st.info(f"မင်္ဂလာပါရှင်.. '{app_mode}' အတွက် အကြံဉာဏ်များ စတင်မေးမြန်းနိုင်ပါပြီ။")
 
-    # 3. Display History
     chat_container = st.container()
     with chat_container:
         for msg in current_history:
@@ -207,7 +206,7 @@ with col_chat:
                 if "audio_path" in msg and msg["audio_path"]:
                     st.audio(msg["audio_path"], format="audio/mp3")
 
-    # 4. Handle New Inputs
+    # Inputs Handling
     voice_text = ""
     if audio_blob:
         with st.spinner("အသံဖတ်နေပါတယ်ရှင်..."):
@@ -215,29 +214,23 @@ with col_chat:
     
     user_query = None
     if voice_text: user_query = voice_text
-    # Chat Input Box (Fixed at bottom of column)
+    
+    # Input box fixed styling
     if prompt := st.chat_input("မေးခွန်း ရေးပါ..."):
         user_query = prompt
 
-    # 5. Process & Append
     if user_query:
-        # User Message
         current_history.append({"role": "user", "content": user_query, "image": current_image})
         with st.chat_message("user"):
             st.write(user_query)
             if current_image: st.image(current_image, width=200)
 
-        # AI Response
         with st.chat_message("assistant"):
             with st.spinner("စဉ်းစားနေပါတယ်ရှင်..."):
-                # System Prompt with Persona & Context
                 system_instruction = (
                     "You are a friendly female agricultural expert. "
-                    "Speak naturally, actively, and warmly using 'Shin' (ရှင်). "
-                    "Keep sentences short and clear. No Markdown bolding if possible."
+                    "Speak naturally using 'Shin' (ရှင်). Keep sentences short."
                 )
-                
-                # Combine Context (Control Panel) + User Question
                 full_prompt = f"{system_instruction}\n\n{context_prompt}\n\nUser Question: {user_query} (Answer in Burmese)"
                 
                 response_text = get_ai_response_smart(full_prompt, current_image)
@@ -248,7 +241,6 @@ with col_chat:
                     audio_file = text_to_speech(response_text)
                     if audio_file: st.audio(audio_file, format="audio/mp3")
 
-                # Save to specific history
                 current_history.append({
                     "role": "assistant", 
                     "content": response_text,
