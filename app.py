@@ -22,7 +22,7 @@ if "GOOGLE_API_KEY" in st.secrets:
 try:
     genai.configure(api_key=GOOGLE_API_KEY)
     # ⚠️ အကောင်းဆုံး M    # ⚠️ အကောင်းဆုံး Model (gemini-1.5-flash)
-    model = genai.GenerativeModel('gemini-2.0-flash')
+    model = genai.GenerativeModel('gemini-1.5-flash')
 except Exception as e:
     st.error(f"API Key Error: {e}")
     st.stop()
@@ -228,5 +228,6 @@ if user_query:
                 "content": response_text,
                 "audio_path": audio_file
             })
+
 
 
