@@ -9,20 +9,20 @@ import os
 import re
 from pydub import AudioSegment
 import io
+import time
 
 # --- Configuration ---
 # ⚠️ Secrets မသုံးဘဲ Code ထဲထည့်မယ်ဆိုရင် ဒီနေရာမှာ Key ထည့်ပါ
-# သို့မဟုတ် Secrets သုံးရင် အောက်က if ခွင်က အလုပ်လုပ်ပါလိမ့်မယ်
 GOOGLE_API_KEY = "YOUR_GEMINI_API_KEY_HERE"
 
-# Setup API Key
+# Setup API Key (Secrets ရှိရင် Secrets ကို ဦးစားပေးမယ်)
 if "GOOGLE_API_KEY" in st.secrets:
     GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
 
 try:
     genai.configure(api_key=GOOGLE_API_KEY)
-    # ⚠️ အကောင်းဆုံး M    # ⚠️ အကောင်းဆုံး Model (gemini-1.5-flash)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # 1.5 အဆင်မပြေရင် 2.0 ကိုပဲ ပြန်သုံးပါမယ် (Error 429 တက်ရင် ၁ မိနစ်လောက် နားပြီးမှ သုံးပါ)
+    model = genai.GenerativeModel('gemini-2.0-flash')
 except Exception as e:
     st.error(f"API Key Error: {e}")
     st.stop()
@@ -30,27 +30,32 @@ except Exception as e:
 # --- Page Setup ---
 st.set_page_config(page_title="Smart Agri Pro", page_icon="🌾", layout="wide")
 
+# --- CSS for Responsive Design (ဖုန်းနှင့် ကွန်ပျူတာ အလိုအလျောက် ချိန်ညှိခြင်း) ---
 st.markdown("""
     <style>
-    /* ပုံမှန် ကွန်ပျူတာ Screen အတွက် ဒီဇိုင်း */
-    .responsive-title {
-        text-align: center;
-        color: #2E8B57;
-        font-size: 3em; /* ကွန်ပျူတာမှာ စာလုံးဆိုဒ် 3 */
+    /* ကွန်ပျူတာ Screen (PC) အတွက် ဒီဇိုင်း */
+    .main-title {
+        text-align: center; 
+        color: #2E8B57; 
+        font-size: 3em; 
         font-weight: bold;
-        margin-bottom: 0px;
+        margin-bottom: 10px;
     }
     
-    /* ဖုန်း Screen (အကျယ် 600px အောက်) အတွက် ဒီဇိုင်း */
+    /* ဖုန်း Screen (Mobile) အတွက် ဒီဇိုင်း - စာလုံးဆိုဒ်ကို လျှော့ချမယ် */
     @media (max-width: 600px) {
-        .responsive-title {
-            font-size: 1.5em; /* ဖုန်းမှာကျတော့ စာလုံးဆိုဒ် 1.5 ပဲ ထားမယ် */
-            margin-top: 10px;
+        .main-title {
+            font-size: 1.8em !important; /* ဖုန်းမှာ 1.8 ပဲ ရှိမယ် */
+            margin-top: 0px;
+        }
+        /* Sidebar ကို ဖုန်းမှာ နည်းနည်း ကျဉ်းမယ် */
+        section[data-testid="stSidebar"] {
+            width: 250px !important;
         }
     }
     </style>
 
-    <h1 class="responsive-title">
+    <h1 class="main-title">
         🌾 Smart Agri - စိုက်ပျိုးရေး လက်ထောက်
     </h1>
 """, unsafe_allow_html=True)
@@ -100,6 +105,9 @@ def get_ai_response(prompt, image=None):
             response = chat.send_message(prompt)
         return response.text
     except Exception as e:
+        # Error 429 (Quota Exceeded) ကို မြန်မာလို ရှင်းပြမယ်
+        if "429" in str(e):
+            return "⚠️ ခဏလေး စောင့်ပေးပါ... Google AI က တစ်မိနစ်ကို မေးခွန်းကန့်သတ်ချက် ပြည့်သွားလို့ပါ။ (၁) မိနစ်လောက် နားပြီးမှ ပြန်မေးပေးပါခင်ဗျာ။"
         return f"Error: {e}"
 
 # --- Sidebar ---
@@ -109,7 +117,7 @@ with st.sidebar:
         ["🏡 အိမ်ခြံသီးနှံ (Garden)", "🌾 စပါးစိုက်ခင်း (Paddy)", "🍂 ရောဂါစစ်ဆေး (Doctor)"])
     
     st.divider()
-    if st.button("🔄 အသစ်ပြန်မေးမယ် (Clear Chat)"):
+    if st.button("🔄 အသစ်ပြန်မေးမယ် (Clear)"):
         st.session_state.history = []
         st.rerun()
     
@@ -117,16 +125,16 @@ with st.sidebar:
 
 # --- Main Logic ---
 
-# Global Variable Initialization
+# Global Variable
 current_image = None 
 context_prompt = ""
 
 # 1. Input Form Section
 with st.expander("📝 အချက်အလက်နှင့် ဓာတ်ပုံ ဖြည့်ရန် (နှိပ်ပါ)", expanded=True):
+    # Responsive Column Layout
     col1, col2 = st.columns([1, 1])
     
-    # ဓာတ်ပုံ Upload (မည်သည့် Mode မဆို ပုံတင်လို့ရအောင် ဒီမှာ ထားလိုက်ပါပြီ)
-    uploaded_file = st.file_uploader("📸 ဓာတ်ပုံ ထည့်လိုပါက ရွေးချယ်ပါ (Camera/Gallery):", type=["jpg", "png", "jpeg"], key="main_uploader")
+    uploaded_file = st.file_uploader("📸 ဓာတ်ပုံ (Camera/Gallery):", type=["jpg", "png", "jpeg"], key="main_uploader")
     if uploaded_file:
         current_image = Image.open(uploaded_file)
         st.image(current_image, caption="တင်ထားသောပုံ", width=200)
@@ -152,17 +160,16 @@ with st.expander("📝 အချက်အလက်နှင့် ဓာတ်�
         context_prompt = "ဒီပုံထဲက အပင်ရောဂါကို စစ်ဆေးပြီး ကုသနည်း ပြောပြပါ။ (Burmese Language)"
 
 # 2. Voice Input
-col_voice, _ = st.columns([1, 4])
-with col_voice:
-    st.write("🎙️ **အသံဖြင့် မေးရန်:**")
-    audio_blob = mic_recorder(start_prompt="🔴 Start", stop_prompt="⬛ Stop", key='recorder')
+st.write("🎙️ **အသံဖြင့် မေးရန်:**")
+# Mobile Responsive Voice UI: Column မခွဲဘဲ တန်းစီလိုက်တယ်
+audio_blob = mic_recorder(start_prompt="🔴 နှိပ်၍ ပြောပါ (Start)", stop_prompt="⬛ ရပ်မည် (Stop)", key='recorder')
 
 voice_text = ""
 if audio_blob:
     with st.spinner("အသံဖတ်နေသည်..."):
         voice_text = transcribe_audio(audio_blob['bytes'])
 
-# 3. Chat Interface & History
+# 3. Chat Interface
 chat_container = st.container()
 with chat_container:
     for msg in st.session_state.history:
@@ -171,54 +178,49 @@ with chat_container:
             if "audio_path" in msg and msg["audio_path"]:
                 st.audio(msg["audio_path"], format="audio/mp3")
 
-# 4. Handle Chat Inputs (Text & Image)
+# 4. Handle Chat Inputs
 user_query = None
 
-# (A) Voice Input Check
 if voice_text:
     user_query = voice_text
 
-# (B) Chat Input Check
 if prompt := st.chat_input("ဆက်လက် မေးမြန်းလိုသည်များ ရေးပါ..."):
     user_query = prompt
 
-# (C) Chat Attachment (Chat ထဲမှာ ပုံထပ်တင်ချင်ရင်)
+# Chat Attachment
 with st.expander("📎 ဓာတ်ပုံ ပူးတွဲတင်ရန် (Chat Attachment)", expanded=False):
     chat_upload = st.file_uploader("Chat အတွက် ပုံရွေးပါ:", type=["jpg", "png", "jpeg"], key="chat_uploader")
     if chat_upload:
-        current_image = Image.open(chat_upload) # Chat ပုံကို ဦးစားပေးမည်
+        current_image = Image.open(chat_upload)
         st.image(current_image, width=150, caption="ပူးတွဲမည့်ပုံ")
 
-# Processing Logic
+# Processing
 if user_query:
     final_prompt = user_query
     
-    # ပထမဆုံးအကြိမ်ဆိုရင် Context ပါ ထည့်ပေါင်းမယ်
     if len(st.session_state.history) == 0 and context_prompt:
         final_prompt = f"{context_prompt} \n\n အသုံးပြုသူမေးခွန်း: {user_query}"
 
-    # User Message Display
     st.session_state.history.append({"role": "user", "content": user_query})
     with st.chat_message("user"):
         st.write(user_query)
-        if current_image and chat_upload: # Chat မှာတင်တဲ့ပုံဆို ပြမယ်
+        if current_image and chat_upload:
             st.image(current_image, width=200)
 
-    # AI Processing
     with st.chat_message("assistant"):
-        with st.spinner("AI စဉ်းစားနေပါသည်..."):
+        with st.spinner("AIပညာရှင် စဉ်းစားနေပါသည်..."):
             full_prompt = f"{final_prompt} (Please answer in Burmese language.)"
             
-            # Safety Check for Image
+            # Safety Check
             if 'current_image' not in locals():
                 current_image = None
                 
             response_text = get_ai_response(full_prompt, current_image)
             st.write(response_text)
             
-            # Audio Generation
+            # Audio
             audio_file = None
-            if enable_voice:
+            if enable_voice and "Error" not in response_text:
                 audio_file = text_to_speech(response_text)
                 if audio_file:
                     st.audio(audio_file, format="audio/mp3")
@@ -228,6 +230,3 @@ if user_query:
                 "content": response_text,
                 "audio_path": audio_file
             })
-
-
-
